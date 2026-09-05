@@ -1,0 +1,166 @@
+import {
+  CalendarClock,
+  ClipboardCheck,
+  FlaskConical,
+  Info,
+  Phone,
+  Pill,
+  Stethoscope,
+  Video,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { Avatar } from "../ui/Avatar";
+import { Badge } from "../ui/Badge";
+import { formatDateLong } from "../../lib/format";
+import type { Appointment, Consultation, HealthProfessional } from "../../types";
+
+interface ConsultationDetailsProps {
+  consultation: Consultation;
+  professional: HealthProfessional;
+  followUpAppointment?: Appointment;
+}
+
+function Section({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-900">
+        <Icon className="h-4 w-4 text-brand-500" />
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function EmptyNote({ children }: { children: ReactNode }) {
+  return <p className="text-sm text-ink-400 italic">{children}</p>;
+}
+
+export function ConsultationDetails({
+  consultation,
+  professional,
+  followUpAppointment,
+}: ConsultationDetailsProps) {
+  const TypeIcon = consultation.consultationType === "video" ? Video : Phone;
+
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-4">
+      <Section icon={Stethoscope} title="Consultation Information">
+        <div className="mb-3 flex items-center gap-3">
+          <Avatar initials={professional.avatar} seed={professional.id} size="md" />
+          <div>
+            <p className="text-sm font-semibold text-ink-900">
+              {professional.name}, {professional.title}
+            </p>
+            <p className="text-xs text-ink-500">{professional.specialty}</p>
+          </div>
+        </div>
+        <dl className="grid grid-cols-2 gap-y-2.5 text-sm">
+          <dt className="text-ink-500">Date</dt>
+          <dd className="text-right font-medium text-ink-800">{formatDateLong(consultation.date)}</dd>
+          <dt className="text-ink-500">Time</dt>
+          <dd className="text-right font-medium text-ink-800">{consultation.time}</dd>
+          <dt className="text-ink-500">Type</dt>
+          <dd className="flex items-center justify-end gap-1.5 text-right font-medium text-ink-800">
+            <TypeIcon className="h-3.5 w-3.5 text-brand-500" />
+            {consultation.consultationType === "video" ? "Video Consultation" : "Audio Consultation"}
+          </dd>
+          <dt className="text-ink-500">Duration</dt>
+          <dd className="text-right font-medium text-ink-800">
+            {consultation.durationMinutes} minutes
+          </dd>
+          <dt className="text-ink-500">Status</dt>
+          <dd className="text-right">
+            <Badge tone="success">Completed</Badge>
+          </dd>
+        </dl>
+      </Section>
+
+      <Section icon={ClipboardCheck} title="Consultation Summary">
+        <p className="text-sm leading-relaxed text-ink-700">{consultation.summary}</p>
+      </Section>
+
+      <Section icon={Info} title="Diagnosis">
+        {consultation.diagnosis ? (
+          <p className="text-sm leading-relaxed text-ink-700">{consultation.diagnosis}</p>
+        ) : (
+          <EmptyNote>No diagnosis recorded</EmptyNote>
+        )}
+      </Section>
+
+      <Section icon={Pill} title="Prescriptions">
+        {consultation.prescriptions.length > 0 ? (
+          <ul className="flex flex-col gap-3">
+            {consultation.prescriptions.map((rx) => (
+              <li key={rx.medication} className="rounded-xl bg-ink-50 p-3">
+                <p className="text-sm font-semibold text-ink-900">{rx.medication}</p>
+                <dl className="mt-1.5 grid grid-cols-2 gap-y-1 text-xs text-ink-600">
+                  <dt>Dosage</dt>
+                  <dd className="text-right">{rx.dosage}</dd>
+                  <dt>Frequency</dt>
+                  <dd className="text-right">{rx.frequency}</dd>
+                  <dt>Duration</dt>
+                  <dd className="text-right">{rx.duration}</dd>
+                </dl>
+                <p className="mt-2 text-xs leading-relaxed text-ink-500">{rx.instructions}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyNote>No prescriptions recorded</EmptyNote>
+        )}
+      </Section>
+
+      <Section icon={FlaskConical} title="Tests">
+        {consultation.tests.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {consultation.tests.map((test) => (
+              <li key={test} className="flex items-center gap-2 text-sm text-ink-700">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400" />
+                {test}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyNote>No tests recommended</EmptyNote>
+        )}
+      </Section>
+
+      <Section icon={CalendarClock} title="Future Appointments">
+        {followUpAppointment ? (
+          <dl className="grid grid-cols-2 gap-y-2.5 text-sm">
+            <dt className="text-ink-500">Date</dt>
+            <dd className="text-right font-medium text-ink-800">
+              {formatDateLong(followUpAppointment.date)}
+            </dd>
+            <dt className="text-ink-500">Time</dt>
+            <dd className="text-right font-medium text-ink-800">{followUpAppointment.time}</dd>
+            <dt className="text-ink-500">Type</dt>
+            <dd className="text-right font-medium text-ink-800">
+              {followUpAppointment.consultationType === "video"
+                ? "Video Consultation"
+                : "Audio Consultation"}
+            </dd>
+            <dt className="text-ink-500">Practitioner</dt>
+            <dd className="text-right font-medium text-ink-800">{professional.name}</dd>
+          </dl>
+        ) : (
+          <EmptyNote>No upcoming appointment</EmptyNote>
+        )}
+      </Section>
+
+      <p className="px-1 text-center text-xs text-ink-400">
+        This is fictional demo medical information for illustration only.
+      </p>
+    </div>
+  );
+}

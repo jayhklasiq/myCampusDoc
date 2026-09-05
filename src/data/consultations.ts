@@ -1,0 +1,118 @@
+import type { Consultation } from "../types";
+
+export const initialConsultations: Consultation[] = [
+  {
+    id: "consult_1",
+    date: "2026-08-24",
+    time: "11:00 AM",
+    professionalId: "prof_mensah",
+    consultationType: "video",
+    durationMinutes: 18,
+    status: "completed",
+    summary:
+      "Follow-up consultation regarding recurring headaches. Discussed frequency (roughly 3-4 times per week), triggers such as screen time and dehydration, and sleep patterns. Reviewed progress since the last visit and adjusted the management plan.",
+    diagnosis: "Tension-type headache, likely related to stress and dehydration.",
+    prescriptions: [
+      {
+        medication: "Ibuprofen",
+        dosage: "400 mg",
+        frequency: "Every 6-8 hours as needed",
+        duration: "7 days",
+        instructions: "Take with food. Do not exceed 3 doses in 24 hours.",
+      },
+    ],
+    tests: [],
+    followUpAppointmentId: "appt_upcoming_1",
+  },
+  {
+    id: "consult_2",
+    date: "2026-08-10",
+    time: "3:00 PM",
+    professionalId: "prof_okafor",
+    consultationType: "audio",
+    durationMinutes: 25,
+    status: "completed",
+    summary:
+      "Discussed increased stress related to coursework and difficulty relaxing in the evenings. Explored coping strategies and reviewed sleep hygiene habits. Student reported mild improvement using breathing exercises introduced previously.",
+    diagnosis: "Adjustment disorder with anxious mood.",
+    prescriptions: [],
+    tests: [],
+    followUpAppointmentId: null,
+  },
+  {
+    id: "consult_3",
+    date: "2026-07-30",
+    time: "1:00 PM",
+    professionalId: "prof_reyes",
+    consultationType: "video",
+    durationMinutes: 12,
+    status: "completed",
+    summary:
+      "Reviewed a red, itchy rash on the forearm that appeared after using a new laundry detergent. Visual examination over video consultation was consistent with a mild allergic reaction.",
+    diagnosis: "Allergic contact dermatitis.",
+    prescriptions: [
+      {
+        medication: "Hydrocortisone Cream 1%",
+        dosage: "Thin layer",
+        frequency: "Twice daily",
+        duration: "5-7 days",
+        instructions: "Apply to affected area only. Discontinue if irritation worsens.",
+      },
+    ],
+    tests: [],
+    followUpAppointmentId: null,
+  },
+  {
+    id: "consult_4",
+    date: "2026-07-15",
+    time: "10:00 AM",
+    professionalId: "prof_kim",
+    consultationType: "audio",
+    durationMinutes: 20,
+    status: "completed",
+    summary:
+      "General wellness consultation focused on building a balanced meal plan around a busy class schedule. Discussed budget-friendly meal prep ideas and hydration habits.",
+    diagnosis: null,
+    prescriptions: [],
+    tests: [],
+    followUpAppointmentId: null,
+  },
+  {
+    id: "consult_5",
+    date: "2026-06-28",
+    time: "9:00 AM",
+    professionalId: "prof_mensah",
+    consultationType: "video",
+    durationMinutes: 15,
+    status: "completed",
+    summary:
+      "Presented with fever, sore throat, and difficulty swallowing for two days. Video examination noted visible throat redness. Recommended in-person or partner-lab testing to confirm before starting antibiotics.",
+    diagnosis: "Suspected streptococcal pharyngitis (strep throat), pending test confirmation.",
+    prescriptions: [
+      {
+        medication: "Amoxicillin",
+        dosage: "500 mg",
+        frequency: "Twice daily",
+        duration: "10 days",
+        instructions: "Complete the full course even if symptoms improve early. Take with water.",
+      },
+    ],
+    tests: ["Rapid Strep Test", "Complete Blood Count"],
+    followUpAppointmentId: null,
+  },
+  {
+    id: "consult_6",
+    date: "2026-06-05",
+    time: "4:00 PM",
+    professionalId: "prof_okafor",
+    consultationType: "audio",
+    durationMinutes: 22,
+    status: "completed",
+    summary:
+      "Discussed ongoing difficulty falling asleep and staying asleep over the past month, along with elevated stress. Reviewed screen time before bed and caffeine intake. Recommended monitoring blood pressure given reported occasional lightheadedness.",
+    diagnosis: null,
+    prescriptions: [],
+    tests: ["Blood Pressure Monitoring"],
+    followUpAppointmentId: "appt_upcoming_2",
+  },
+];
