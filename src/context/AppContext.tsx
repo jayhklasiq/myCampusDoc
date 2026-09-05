@@ -4,6 +4,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
   type ReactNode,
 } from "react";
 import {
@@ -178,6 +179,7 @@ function reducer(state: AppState, action: Action): AppState {
 interface AppContextValue extends AppState {
   isAuthenticated: boolean;
   hasActiveSubscription: boolean;
+  isHydrated: boolean;
   signUp: (user: User) => void;
   subscribe: (planId: PlanId) => void;
   addMedicalNote: (text: string) => void;
@@ -202,24 +204,31 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  // Session/subscription persist across reloads via localStorage, but that read only
+  // resolves after mount. Route guards must not judge auth state until it's known,
+  // otherwise a refresh on a protected page reads the blank initial state and bounces
+  // an already-logged-in student back to /signup before the real data ever loads.
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     const persisted = loadState<AppState>();
     if (persisted) {
       dispatch({ type: "HYDRATE", state: { ...initialState, ...persisted } });
     }
+    setIsHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    saveState(state);
-  }, [state]);
+    if (isHydrated) saveState(state);
+  }, [state, isHydrated]);
 
   const value = useMemo<AppContextValue>(
     () => ({
       ...state,
       isAuthenticated: !!state.user,
       hasActiveSubscription: !!state.subscription,
+      isHydrated,
       signUp: (user) => dispatch({ type: "SIGN_UP", user }),
       subscribe: (planId) => dispatch({ type: "SUBSCRIBE", planId }),
       addMedicalNote: (text) => dispatch({ type: "ADD_MEDICAL_NOTE", text }),
@@ -256,7 +265,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return appointment;
       },
     }),
-    [state],
+    [state, isHydrated],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
