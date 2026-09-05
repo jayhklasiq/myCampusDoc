@@ -2,11 +2,12 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { LoadingState } from "./components/ui/LoadingState";
 import { AppProvider, useApp } from "./context/AppContext";
-import { PaymentGate, RequireSubscription, SignUpGate } from "./routes/guards";
+import { LoginGate, PaymentGate, RequireSubscription, SignUpGate } from "./routes/guards";
 import { ChatConversationPage } from "./pages/ChatConversationPage";
 import { ChatPage } from "./pages/ChatPage";
 import { HistoryDetailPage } from "./pages/HistoryDetailPage";
 import { HistoryPage } from "./pages/HistoryPage";
+import { LoginPage } from "./pages/LoginPage";
 import { PaymentPage } from "./pages/PaymentPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SchedulePage } from "./pages/SchedulePage";
@@ -22,6 +23,15 @@ export default function App() {
   );
 }
 
+/** Sends a visitor wherever their current auth/account/subscription state implies they belong. */
+function RootRedirect() {
+  const { isAuthenticated, hasActiveSubscription, hasAccount } = useApp();
+  if (isAuthenticated && hasActiveSubscription) return <Navigate to="/profile" replace />;
+  if (isAuthenticated && !hasActiveSubscription) return <Navigate to="/payment" replace />;
+  if (hasAccount) return <Navigate to="/login" replace />;
+  return <Navigate to="/signup" replace />;
+}
+
 function AppRoutes() {
   const { isHydrated } = useApp();
 
@@ -34,13 +44,21 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route index element={<Navigate to="/signup" replace />} />
+      <Route index element={<RootRedirect />} />
       <Route
         path="/signup"
         element={
           <SignUpGate>
             <SignUpPage />
           </SignUpGate>
+        }
+      />
+      <Route
+        path="/login"
+        element={
+          <LoginGate>
+            <LoginPage />
+          </LoginGate>
         }
       />
       <Route
@@ -79,7 +97,7 @@ function AppRoutes() {
           </RequireSubscription>
         }
       />
-      <Route path="*" element={<Navigate to="/signup" replace />} />
+      <Route path="*" element={<RootRedirect />} />
     </Routes>
   );
 }

@@ -28,8 +28,15 @@ import type {
   User,
 } from "../types";
 
+interface Credentials {
+  email: string;
+  password: string;
+}
+
 interface AppState {
   user: User | null;
+  credentials: Credentials | null;
+  isLoggedIn: boolean;
   subscription: Subscription | null;
   medicalNotes: MedicalNote[];
   conversations: Conversation[];
@@ -43,6 +50,8 @@ interface AppState {
 
 const initialState: AppState = {
   user: null,
+  credentials: null,
+  isLoggedIn: false,
   subscription: null,
   medicalNotes: [],
   conversations: initialConversations,
@@ -55,7 +64,9 @@ const initialState: AppState = {
 };
 
 type Action =
-  | { type: "SIGN_UP"; user: User }
+  | { type: "SIGN_UP"; user: User; password: string }
+  | { type: "LOG_IN" }
+  | { type: "LOG_OUT" }
   | { type: "SUBSCRIBE"; planId: PlanId }
   | { type: "ADD_MEDICAL_NOTE"; text: string }
   | { type: "UPDATE_MEDICAL_NOTE"; id: string; text: string }
@@ -79,7 +90,16 @@ function reducer(state: AppState, action: Action): AppState {
     case "HYDRATE":
       return action.state;
     case "SIGN_UP":
-      return { ...state, user: action.user };
+      return {
+        ...state,
+        user: action.user,
+        credentials: { email: action.user.email.toLowerCase(), password: action.password },
+        isLoggedIn: true,
+      };
+    case "LOG_IN":
+      return { ...state, isLoggedIn: true };
+    case "LOG_OUT":
+      return { ...state, isLoggedIn: false };
     case "SUBSCRIBE":
       return {
         ...state,
@@ -178,9 +198,12 @@ function reducer(state: AppState, action: Action): AppState {
 
 interface AppContextValue extends AppState {
   isAuthenticated: boolean;
+  hasAccount: boolean;
   hasActiveSubscription: boolean;
   isHydrated: boolean;
-  signUp: (user: User) => void;
+  signUp: (user: User, password: string) => void;
+  logIn: (email: string, password: string) => { success: boolean; error?: string };
+  logOut: () => void;
   subscribe: (planId: PlanId) => void;
   addMedicalNote: (text: string) => void;
   updateMedicalNote: (id: string, text: string) => void;
@@ -226,10 +249,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppContextValue>(
     () => ({
       ...state,
-      isAuthenticated: !!state.user,
+      isAuthenticated: !!state.user && state.isLoggedIn,
+      hasAccount: !!state.user,
       hasActiveSubscription: !!state.subscription,
       isHydrated,
-      signUp: (user) => dispatch({ type: "SIGN_UP", user }),
+      signUp: (user, password) => dispatch({ type: "SIGN_UP", user, password }),
+      logIn: (email, password) => {
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!state.credentials || state.credentials.email !== normalizedEmail) {
+          return {
+            success: false,
+            error: "No account found with that email. Sign up to get started.",
+          };
+        }
+        if (state.credentials.password !== password) {
+          return { success: false, error: "Incorrect password. Please try again." };
+        }
+        dispatch({ type: "LOG_IN" });
+        return { success: true };
+      },
+      logOut: () => dispatch({ type: "LOG_OUT" }),
       subscribe: (planId) => dispatch({ type: "SUBSCRIBE", planId }),
       addMedicalNote: (text) => dispatch({ type: "ADD_MEDICAL_NOTE", text }),
       updateMedicalNote: (id, text) =>

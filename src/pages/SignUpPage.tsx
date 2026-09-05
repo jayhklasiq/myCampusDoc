@@ -1,6 +1,6 @@
 import { HeartPulse, ShieldCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { TextField } from "../components/ui/TextField";
 import { useApp } from "../context/AppContext";
@@ -34,11 +34,14 @@ export function SignUpPage() {
 
     setSubmitting(true);
     window.setTimeout(() => {
-      signUp({
-        fullName: values.fullName.trim(),
-        email: values.email.trim(),
-        phone: values.phone.trim(),
-      });
+      signUp(
+        {
+          fullName: values.fullName.trim(),
+          email: values.email.trim(),
+          phone: values.phone.trim(),
+        },
+        values.password,
+      );
       navigate("/payment");
     }, 500);
   }
@@ -114,7 +117,14 @@ export function SignUpPage() {
           </form>
         </div>
 
-        <p className="mt-5 flex items-center justify-center gap-1.5 text-center text-xs text-ink-400">
+        <p className="mt-5 text-center text-sm text-ink-500">
+          Already have an account?{" "}
+          <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700">
+            Log in
+          </Link>
+        </p>
+
+        <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-ink-400">
           <ShieldCheck className="h-3.5 w-3.5" />
           Demo product — please don't enter real personal information.
         </p>

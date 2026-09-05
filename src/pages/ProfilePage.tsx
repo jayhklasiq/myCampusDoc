@@ -1,26 +1,35 @@
 import {
   CalendarClock,
   ClipboardList,
+  LogOut,
   MessageCircle,
   Phone,
   ShieldCheck,
   User,
   Video,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "../components/layout/Header";
 import { MedicalNotes } from "../components/profile/MedicalNotes";
 import { ProfileSection } from "../components/profile/ProfileSection";
 import { Avatar } from "../components/ui/Avatar";
 import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Modal } from "../components/ui/Modal";
 import { useApp } from "../context/AppContext";
 import { getProfessional, paymentPlans } from "../data";
 import { formatDateLong } from "../lib/format";
 
 export function ProfilePage() {
-  const { user, subscription, appointments, consultations } = useApp();
+  const { user, subscription, appointments, consultations, logOut } = useApp();
   const navigate = useNavigate();
+  const [logOutModalOpen, setLogOutModalOpen] = useState(false);
+
+  function handleLogOut() {
+    logOut();
+    navigate("/login");
+  }
 
   const plan = paymentPlans.find((p) => p.id === subscription?.planId);
 
@@ -167,7 +176,35 @@ export function ProfilePage() {
         </ProfileSection>
 
         <MedicalNotes />
+
+        <button
+          type="button"
+          onClick={() => setLogOutModalOpen(true)}
+          className="flex items-center justify-center gap-2 rounded-2xl border border-ink-200 bg-white py-3 text-sm font-semibold text-ink-600 transition-colors hover:bg-ink-50"
+        >
+          <LogOut className="h-4 w-4" />
+          Log out
+        </button>
       </div>
+
+      <Modal open={logOutModalOpen} onClose={() => setLogOutModalOpen(false)} title="Log out?">
+        <p className="text-sm text-ink-600">
+          You can log back in anytime with your email and password. Your data stays saved on
+          this device.
+        </p>
+        <div className="mt-5 flex gap-3">
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={() => setLogOutModalOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button variant="danger" fullWidth onClick={handleLogOut}>
+            Log out
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
