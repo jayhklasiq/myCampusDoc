@@ -16,6 +16,8 @@ export function ConsultationCard({ consultation }: ConsultationCardProps) {
   if (!professional) return null;
   const TypeIcon = consultation.consultationType === "video" ? Video : Phone;
 
+  const isScheduled = consultation.status === "scheduled";
+
   return (
     <button
       type="button"
@@ -30,12 +32,19 @@ export function ConsultationCard({ consultation }: ConsultationCardProps) {
             <p className="text-sm text-ink-600">{professional.name}</p>
           </div>
         </div>
-        <Badge tone="success">Completed</Badge>
+        <Badge tone={isScheduled ? "accent" : "success"}>
+          {isScheduled ? "Scheduled" : "Completed"}
+        </Badge>
       </div>
 
       <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand-600">
         <TypeIcon className="h-3.5 w-3.5" />
         {consultation.consultationType === "video" ? "Video Consultation" : "Audio Consultation"}
+        {consultation.aiIntakeSummary && (
+          <Badge tone="brand" className="ml-1">
+            AI Intake
+          </Badge>
+        )}
       </div>
 
       <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ink-500">

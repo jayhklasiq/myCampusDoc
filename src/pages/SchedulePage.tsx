@@ -43,13 +43,17 @@ export function SchedulePage() {
   );
 
   const PendingIcon = pendingConsultationType === "video" ? Video : Phone;
+  // The AI intake flow can hand off a specific clinician without having
+  // pre-chosen audio/video (that's still picked in the modal below), so the
+  // banner needs to show for that case too, not just the audio/video-button path.
+  const hasPendingScheduling = !!pendingConsultationType || !!pendingProfessionalId;
 
   return (
     <div className="animate-fade-in">
       <Header title="Schedule" subtitle="Book and manage your consultations" />
 
       <div className="flex flex-col gap-5 px-4 py-4">
-        {pendingConsultationType && (
+        {hasPendingScheduling && (
           <div className="flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white">
               <PendingIcon className="h-4 w-4" />

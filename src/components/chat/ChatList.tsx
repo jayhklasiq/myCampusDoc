@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "../ui/Avatar";
-import { getProfessional } from "../../data";
+import { getConversationPersona } from "../../lib/chatPersona";
 import { formatRelativeTimestamp } from "../../lib/format";
 import type { Conversation } from "../../types";
 
@@ -14,8 +14,7 @@ export function ChatList({ conversations }: ChatListProps) {
   return (
     <ul className="flex flex-col divide-y divide-ink-100">
       {conversations.map((conversation) => {
-        const professional = getProfessional(conversation.professionalId);
-        if (!professional) return null;
+        const professional = getConversationPersona(conversation);
         const unread = conversation.unreadCount > 0;
 
         return (

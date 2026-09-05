@@ -4,6 +4,7 @@ import {
   AIServiceUnavailableError,
   generateChatResponse,
   MissingApiKeyError,
+  type ChatMode,
   type ChatTurn,
 } from "../services/claude.js";
 
@@ -15,8 +16,18 @@ export const chatRouter = Router();
 const MAX_MESSAGES = 40;
 const MAX_MESSAGE_LENGTH = 4000;
 
+// Safety net against an intake conversation running forever (requirement:
+// "the AI should not keep asking questions simply because it can"). Once the
+// student has sent this many messages without the AI reaching a conclusion,
+// the model is instructed to finalize triage on this turn regardless.
+const FORCE_COMPLETE_AFTER_USER_TURNS = 6;
+
 function isValidRole(role: unknown): role is ChatTurn["role"] {
   return role === "user" || role === "assistant";
+}
+
+function isValidMode(mode: unknown): mode is ChatMode {
+  return mode === "doctor" || mode === "intake";
 }
 
 chatRouter.post("/chat", async (req: Request, res: Response) => {
@@ -27,7 +38,17 @@ chatRouter.post("/chat", async (req: Request, res: Response) => {
     return;
   }
 
-  const { messages } = body as { messages: unknown };
+  // `mode` selects which fixed, server-owned system prompt is used (doctor
+  // thread vs. AI intake). It is validated against a closed set — the
+  // client can influence *which* prompt applies to its own conversation,
+  // never *what* either prompt says.
+  const { messages, mode: rawMode } = body as { messages: unknown; mode?: unknown };
+  if (rawMode !== undefined && !isValidMode(rawMode)) {
+    res.status(400).json({ error: "'mode' must be 'doctor' or 'intake'." });
+    return;
+  }
+  const mode: ChatMode = rawMode === undefined ? "doctor" : rawMode;
+
   if (!Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ error: "Message history must not be empty." });
     return;
@@ -72,9 +93,12 @@ chatRouter.post("/chat", async (req: Request, res: Response) => {
     return;
   }
 
+  const userTurnCount = trimmed.filter((t) => t.role === "user").length;
+  const forceComplete = mode === "intake" && userTurnCount >= FORCE_COMPLETE_AFTER_USER_TURNS;
+
   try {
-    const reply = await generateChatResponse(trimmed);
-    res.status(200).json({ reply });
+    const { reply, triage } = await generateChatResponse(trimmed, mode, forceComplete);
+    res.status(200).json({ reply, triage });
   } catch (error) {
     handleChatError(error, res);
   }

@@ -8,6 +8,7 @@ export const initialConversations: Conversation[] = [
   {
     id: "conv_mensah",
     professionalId: "prof_mensah",
+    stage: "doctor_consultation",
     lastMessage: "Great, let's keep an eye on it and touch base at your follow-up.",
     lastMessageAt: iso(subMinutes(now, 12)),
     unreadCount: 2,
@@ -15,6 +16,7 @@ export const initialConversations: Conversation[] = [
   {
     id: "conv_reyes",
     professionalId: "prof_reyes",
+    stage: "doctor_consultation",
     lastMessage: "The cream should help within a few days — let me know if the rash spreads.",
     lastMessageAt: iso(subHours(now, 5)),
     unreadCount: 0,
@@ -22,6 +24,7 @@ export const initialConversations: Conversation[] = [
   {
     id: "conv_okafor",
     professionalId: "prof_okafor",
+    stage: "doctor_consultation",
     lastMessage: "Sounds good. Try the breathing exercise before bed and we'll check in next week.",
     lastMessageAt: iso(subDays(now, 2)),
     unreadCount: 0,
@@ -29,6 +32,7 @@ export const initialConversations: Conversation[] = [
   {
     id: "conv_kim",
     professionalId: "prof_kim",
+    stage: "doctor_consultation",
     lastMessage: "Feel free to message anytime you have questions about your meal plan.",
     lastMessageAt: iso(subDays(now, 9)),
     unreadCount: 0,

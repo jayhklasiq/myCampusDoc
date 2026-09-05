@@ -2,13 +2,16 @@ import { AlertCircle, MessageCircle, Phone, Send, Video } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Header } from "../components/layout/Header";
+import { ClinicianRecommendationCard } from "../components/chat/ClinicianRecommendationCard";
 import { MessageBubble } from "../components/chat/MessageBubble";
+import { TriageAdvisoryBanner } from "../components/chat/TriageAdvisoryBanner";
 import { TypingIndicator } from "../components/chat/TypingIndicator";
 import { HealthProfessionalCard } from "../components/professionals/HealthProfessionalCard";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useApp } from "../context/AppContext";
 import { getProfessional } from "../data";
+import { getConversationPersona } from "../lib/chatPersona";
 
 export function ChatConversationPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
@@ -22,12 +25,13 @@ export function ChatConversationPage() {
     chatErrors,
     markConversationRead,
     setPendingConsultation,
+    proceedToClinicianSelection,
   } = useApp();
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const conversation = conversations.find((c) => c.id === conversationId);
-  const professional = conversation ? getProfessional(conversation.professionalId) : undefined;
+  const persona = conversation ? getConversationPersona(conversation) : undefined;
   const isPending = !!conversationId && pendingConversationIds.has(conversationId);
   const chatError = conversationId ? chatErrors[conversationId] : undefined;
 
@@ -46,57 +50,82 @@ export function ChatConversationPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [thread.length, isPending, chatError]);
+  }, [thread.length, isPending, chatError, conversation?.stage]);
 
-  if (!conversation || !professional) {
+  if (!conversation || !persona) {
     return <Navigate to="/chat" replace />;
   }
+
+  const canChat =
+    conversation.stage === "ai_intake" ||
+    conversation.stage === "doctor_consultation" ||
+    conversation.stage === "scheduled";
+  const showCallButtons = conversation.professionalId !== null;
+
+  const recommendedClinicians = (conversation.recommendedProfessionalIds ?? [])
+    .map((id) => getProfessional(id))
+    .filter((p): p is NonNullable<typeof p> => !!p);
 
   function handleSend(e: FormEvent) {
     e.preventDefault();
     const text = draft.trim();
-    if (!text || !conversationId || isPending) return;
+    if (!text || !conversationId || isPending || !canChat) return;
     sendMessage(conversationId, text);
     setDraft("");
   }
 
   function startConsultationScheduling(type: "audio" | "video") {
+    if (!persona || persona.isAI) return;
     const label = type === "video" ? "Schedule Video Consultation" : "Schedule Audio Consultation";
-    setPendingConsultation(type, label, professional!.id);
+    setPendingConsultation(type, label, persona.id);
+    navigate("/schedule");
+  }
+
+  function handleViewTimes(clinicianId: string, clinicianName: string) {
+    if (!conversationId) return;
+    setPendingConsultation(null, `Schedule with ${clinicianName}`, clinicianId, conversationId);
     navigate("/schedule");
   }
 
   return (
     <div className="flex h-dvh flex-col bg-ink-50">
       <Header
-        title={professional.name}
-        subtitle={professional.online ? "Online now" : professional.availabilityNote}
+        title={persona.name}
+        subtitle={
+          persona.isAI
+            ? persona.title
+            : persona.online
+              ? "Online now"
+              : persona.availabilityNote
+        }
         showBack
         onBack={() => navigate("/chat")}
         right={
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => startConsultationScheduling("audio")}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-brand-600 transition-colors hover:bg-brand-50 active:bg-brand-100"
-              aria-label="Schedule an audio consultation"
-              title="Schedule an audio consultation"
-            >
-              <Phone className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => startConsultationScheduling("video")}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-brand-600 transition-colors hover:bg-brand-50 active:bg-brand-100"
-              aria-label="Schedule a video consultation"
-              title="Schedule a video consultation"
-            >
-              <Video className="h-5 w-5" />
-            </button>
-          </div>
+          showCallButtons ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => startConsultationScheduling("audio")}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-brand-600 transition-colors hover:bg-brand-50 active:bg-brand-100"
+                aria-label="Schedule an audio consultation"
+                title="Schedule an audio consultation"
+              >
+                <Phone className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => startConsultationScheduling("video")}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-brand-600 transition-colors hover:bg-brand-50 active:bg-brand-100"
+                aria-label="Schedule a video consultation"
+                title="Schedule a video consultation"
+              >
+                <Video className="h-5 w-5" />
+              </button>
+            </div>
+          ) : undefined
         }
       />
-      <HealthProfessionalCard professional={professional} />
+      <HealthProfessionalCard professional={persona} />
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
@@ -104,7 +133,7 @@ export function ChatConversationPage() {
             <EmptyState
               icon={MessageCircle}
               title="Start the conversation"
-              description={`Send a message to start chatting with ${professional.name}.`}
+              description={`Send a message to start chatting with ${persona.name}.`}
             />
           )}
           {thread.map((message) => (
@@ -128,32 +157,66 @@ export function ChatConversationPage() {
               </Button>
             </div>
           )}
+
+          {conversation.stage === "urgent_advisory" && (
+            <TriageAdvisoryBanner
+              level="urgent"
+              onFindClinician={() => conversationId && proceedToClinicianSelection(conversationId)}
+            />
+          )}
+          {conversation.stage === "emergency_advisory" && <TriageAdvisoryBanner level="emergency" />}
+
+          {conversation.stage === "clinician_selection" && recommendedClinicians.length > 0 && (
+            <div className="flex flex-col gap-2.5">
+              <p className="px-1 text-xs font-medium tracking-wide text-ink-400 uppercase">
+                Recommended for your consultation
+              </p>
+              {recommendedClinicians.map((clinician) => (
+                <ClinicianRecommendationCard
+                  key={clinician.id}
+                  professional={clinician}
+                  onViewTimes={() => handleViewTimes(clinician.id, clinician.name)}
+                />
+              ))}
+            </div>
+          )}
+
           <div ref={bottomRef} />
         </div>
       </div>
 
-      <form
-        onSubmit={handleSend}
-        className="safe-bottom border-t border-ink-100 bg-white px-3 py-3"
-      >
-        <div className="mx-auto flex max-w-2xl items-center gap-2">
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 rounded-full border border-ink-200 bg-ink-50 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          />
-          <button
-            type="submit"
-            disabled={!draft.trim() || isPending}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:bg-ink-200 disabled:text-ink-400"
-            aria-label="Send message"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+      {canChat ? (
+        <form
+          onSubmit={handleSend}
+          className="safe-bottom border-t border-ink-100 bg-white px-3 py-3"
+        >
+          <div className="mx-auto flex max-w-2xl items-center gap-2">
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 rounded-full border border-ink-200 bg-ink-50 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+            <button
+              type="submit"
+              disabled={!draft.trim() || isPending}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:bg-ink-200 disabled:text-ink-400"
+              aria-label="Send message"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="safe-bottom border-t border-ink-100 bg-white px-4 py-3 text-center text-xs text-ink-400">
+          {conversation.stage === "clinician_selection"
+            ? "Select a clinician above to continue."
+            : conversation.stage === "emergency_advisory"
+              ? "Please seek emergency care. This conversation is no longer being monitored."
+              : "This conversation is being routed — one moment."}
         </div>
-      </form>
+      )}
     </div>
   );
 }

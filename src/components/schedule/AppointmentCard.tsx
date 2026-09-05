@@ -41,6 +41,11 @@ export function AppointmentCard({ appointment, showDate }: AppointmentCardProps)
         <div className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-brand-600">
           <TypeIcon className="h-3.5 w-3.5" />
           {appointment.consultationType === "video" ? "Video Consultation" : "Audio Consultation"}
+          {appointment.aiIntakeSummary && (
+            <Badge tone="brand" className="ml-1">
+              AI Intake
+            </Badge>
+          )}
         </div>
         {appointment.note && (
           <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-ink-500">
