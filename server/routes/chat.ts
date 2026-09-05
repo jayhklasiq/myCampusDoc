@@ -1,6 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Router, type Request, type Response } from "express";
-import { generateChatReply, MissingApiKeyError, type ChatTurn } from "../services/claude.js";
+import {
+  AIServiceUnavailableError,
+  generateChatResponse,
+  MissingApiKeyError,
+  type ChatTurn,
+} from "../services/claude.js";
 
 export const chatRouter = Router();
 
@@ -68,7 +73,7 @@ chatRouter.post("/chat", async (req: Request, res: Response) => {
   }
 
   try {
-    const reply = await generateChatReply(trimmed);
+    const reply = await generateChatResponse(trimmed);
     res.status(200).json({ reply });
   } catch (error) {
     handleChatError(error, res);
@@ -78,11 +83,22 @@ chatRouter.post("/chat", async (req: Request, res: Response) => {
 function handleChatError(error: unknown, res: Response): void {
   if (error instanceof MissingApiKeyError) {
     console.error(
-      "[chat] ANTHROPIC_API_KEY is not set. Add it to your .env file (see .env.example) and restart the server.",
+      "[chat] No AI provider is configured. Add ANTHROPIC_API_KEY and/or RODIUM_API_KEY to your .env file (see .env.example) and restart the server.",
     );
     res
       .status(500)
       .json({ error: "The chat assistant isn't configured yet. Please try again later." });
+    return;
+  }
+
+  if (error instanceof AIServiceUnavailableError) {
+    // Anthropic hit its insufficient-credits condition and the Rodium
+    // fallback either isn't configured or failed too — the specific cause is
+    // already logged inside generateChatResponse(); keep this generic.
+    console.error("[chat] AI service unavailable after exhausting all configured providers.");
+    res.status(503).json({
+      error: "The chat assistant is temporarily unavailable. Please try again in a moment.",
+    });
     return;
   }
 
