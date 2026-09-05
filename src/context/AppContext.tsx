@@ -12,8 +12,8 @@ import {
   initialConsultations,
   initialConversations,
   initialMessages,
-  mockReplies,
 } from "../data";
+import { requestChatReply, type ChatApiTurn } from "../lib/chatApi";
 import { generateId } from "../lib/id";
 import { loadState, saveState } from "../lib/storage";
 import type {
@@ -196,11 +196,22 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
+export interface ChatError {
+  /** The user's message that failed to get a reply, so it can be retried verbatim. */
+  text: string;
+  /** Safe, user-facing message (already sanitized server-side). */
+  message: string;
+}
+
 interface AppContextValue extends AppState {
   isAuthenticated: boolean;
   hasAccount: boolean;
   hasActiveSubscription: boolean;
   isHydrated: boolean;
+  /** Conversation IDs with a Claude reply currently in flight. */
+  pendingConversationIds: Set<string>;
+  /** Conversation IDs whose most recent reply attempt failed, and why. */
+  chatErrors: Record<string, ChatError>;
   signUp: (user: User, password: string) => void;
   logIn: (email: string, password: string) => { success: boolean; error?: string };
   logOut: () => void;
@@ -208,6 +219,7 @@ interface AppContextValue extends AppState {
   addMedicalNote: (text: string) => void;
   updateMedicalNote: (id: string, text: string) => void;
   sendMessage: (conversationId: string, text: string) => void;
+  retryLastMessage: (conversationId: string) => void;
   markConversationRead: (conversationId: string) => void;
   setPendingConsultation: (
     consultationType: ConsultationType | null,
@@ -225,6 +237,11 @@ interface AppContextValue extends AppState {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+// Client-side courtesy trim mirroring the server's own cap (server/routes/chat.ts) —
+// keeps requests small/cheap. The server enforces its own limit independently, so this
+// is not the security boundary, just avoids sending history we know will be dropped.
+const MAX_CLIENT_HISTORY_TURNS = 20;
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   // Session/subscription persist across reloads via localStorage, but that read only
@@ -232,6 +249,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // otherwise a refresh on a protected page reads the blank initial state and bounces
   // an already-logged-in student back to /signup before the real data ever loads.
   const [isHydrated, setIsHydrated] = useState(false);
+
+  // Chat request state is intentionally NOT part of the persisted reducer state above —
+  // an in-flight request or a stale error has no business surviving a page reload.
+  const [pendingConversationIds, setPendingConversationIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [chatErrors, setChatErrors] = useState<Record<string, ChatError>>({});
 
   useEffect(() => {
     const persisted = loadState<AppState>();
@@ -246,6 +270,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isHydrated) saveState(state);
   }, [state, isHydrated]);
 
+  // Sends the conversation-so-far to Claude and resolves it into either a new
+  // "professional" message or a recorded chat error the UI can offer to retry.
+  // `latestUserText` is the newest user turn: on a first send it hasn't been added to
+  // `state.messages` yet (the SEND_MESSAGE dispatch that adds it hasn't re-rendered this
+  // closure), so it's appended manually; on a retry it's already the last message in the
+  // thread, so it isn't added twice.
+  async function performReply(conversationId: string, latestUserText: string, isRetry: boolean) {
+    setPendingConversationIds((prev) => new Set(prev).add(conversationId));
+    if (!isRetry) {
+      setChatErrors((prev) => {
+        if (!(conversationId in prev)) return prev;
+        const { [conversationId]: _removed, ...rest } = prev;
+        return rest;
+      });
+    }
+
+    const thread = state.messages
+      .filter((m) => m.conversationId === conversationId)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    const turns: ChatApiTurn[] = thread.map((m) => ({
+      role: m.sender === "student" ? "user" : "assistant",
+      content: m.text,
+    }));
+    if (!isRetry) {
+      turns.push({ role: "user", content: latestUserText });
+    }
+
+    try {
+      const reply = await requestChatReply(turns.slice(-MAX_CLIENT_HISTORY_TURNS));
+      dispatch({ type: "RECEIVE_MESSAGE", conversationId, text: reply });
+      setChatErrors((prev) => {
+        if (!(conversationId in prev)) return prev;
+        const { [conversationId]: _removed, ...rest } = prev;
+        return rest;
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong. Please try again in a moment.";
+      setChatErrors((prev) => ({ ...prev, [conversationId]: { text: latestUserText, message } }));
+    } finally {
+      setPendingConversationIds((prev) => {
+        if (!prev.has(conversationId)) return prev;
+        const next = new Set(prev);
+        next.delete(conversationId);
+        return next;
+      });
+    }
+  }
+
   const value = useMemo<AppContextValue>(
     () => ({
       ...state,
@@ -253,6 +327,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       hasAccount: !!state.user,
       hasActiveSubscription: !!state.subscription,
       isHydrated,
+      pendingConversationIds,
+      chatErrors,
       signUp: (user, password) => dispatch({ type: "SIGN_UP", user, password }),
       logIn: (email, password) => {
         const normalizedEmail = email.trim().toLowerCase();
@@ -274,11 +350,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateMedicalNote: (id, text) =>
         dispatch({ type: "UPDATE_MEDICAL_NOTE", id, text }),
       sendMessage: (conversationId, text) => {
+        if (pendingConversationIds.has(conversationId)) return;
         dispatch({ type: "SEND_MESSAGE", conversationId, text });
-        const reply = mockReplies[Math.floor(Math.random() * mockReplies.length)];
-        window.setTimeout(() => {
-          dispatch({ type: "RECEIVE_MESSAGE", conversationId, text: reply });
-        }, 1400);
+        void performReply(conversationId, text, false);
+      },
+      retryLastMessage: (conversationId) => {
+        if (pendingConversationIds.has(conversationId)) return;
+        const failed = chatErrors[conversationId];
+        if (!failed) return;
+        void performReply(conversationId, failed.text, true);
       },
       markConversationRead: (conversationId) =>
         dispatch({ type: "MARK_CONVERSATION_READ", conversationId }),
@@ -304,7 +384,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return appointment;
       },
     }),
-    [state, isHydrated],
+    // performReply is a plain function redefined every render; its only real dependency
+    // (state) is already tracked below, and the setState functions are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state, isHydrated, pendingConversationIds, chatErrors],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

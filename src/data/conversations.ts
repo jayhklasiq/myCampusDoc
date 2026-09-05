@@ -118,10 +118,3 @@ export const initialMessages: Message[] = [
     timestamp: iso(subDays(now, 9)),
   },
 ];
-
-export const mockReplies: string[] = [
-  "Thanks for letting me know — I'll keep that in mind for your next visit.",
-  "That's helpful context. Let's discuss it more at your upcoming consultation.",
-  "Got it. If symptoms change before then, feel free to message me again.",
-  "Understood. In the meantime, keep tracking how you're feeling day to day.",
-];

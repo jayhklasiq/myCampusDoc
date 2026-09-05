@@ -1,22 +1,34 @@
-import { Phone, Send, Video } from "lucide-react";
+import { AlertCircle, Phone, Send, Video } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Header } from "../components/layout/Header";
 import { MessageBubble } from "../components/chat/MessageBubble";
+import { TypingIndicator } from "../components/chat/TypingIndicator";
 import { HealthProfessionalCard } from "../components/professionals/HealthProfessionalCard";
+import { Button } from "../components/ui/Button";
 import { useApp } from "../context/AppContext";
 import { getProfessional } from "../data";
 
 export function ChatConversationPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
-  const { conversations, messages, sendMessage, markConversationRead, setPendingConsultation } =
-    useApp();
+  const {
+    conversations,
+    messages,
+    sendMessage,
+    retryLastMessage,
+    pendingConversationIds,
+    chatErrors,
+    markConversationRead,
+    setPendingConsultation,
+  } = useApp();
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const conversation = conversations.find((c) => c.id === conversationId);
   const professional = conversation ? getProfessional(conversation.professionalId) : undefined;
+  const isPending = !!conversationId && pendingConversationIds.has(conversationId);
+  const chatError = conversationId ? chatErrors[conversationId] : undefined;
 
   const thread = useMemo(
     () =>
@@ -33,7 +45,7 @@ export function ChatConversationPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [thread.length]);
+  }, [thread.length, isPending, chatError]);
 
   if (!conversation || !professional) {
     return <Navigate to="/chat" replace />;
@@ -42,7 +54,7 @@ export function ChatConversationPage() {
   function handleSend(e: FormEvent) {
     e.preventDefault();
     const text = draft.trim();
-    if (!text || !conversationId) return;
+    if (!text || !conversationId || isPending) return;
     sendMessage(conversationId, text);
     setDraft("");
   }
@@ -90,6 +102,24 @@ export function ChatConversationPage() {
           {thread.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))}
+          {isPending && <TypingIndicator />}
+          {chatError && (
+            <div className="animate-slide-up flex flex-col gap-2 rounded-2xl border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-600">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{chatError.message}</span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="self-start"
+                onClick={() => conversationId && retryLastMessage(conversationId)}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
       </div>
@@ -108,7 +138,7 @@ export function ChatConversationPage() {
           />
           <button
             type="submit"
-            disabled={!draft.trim()}
+            disabled={!draft.trim() || isPending}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:bg-ink-200 disabled:text-ink-400"
             aria-label="Send message"
           >
