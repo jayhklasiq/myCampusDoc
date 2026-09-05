@@ -83,6 +83,7 @@ type Action =
       type: "CREATE_APPOINTMENT";
       appointment: Appointment;
     }
+  | { type: "START_CONVERSATION"; conversationId: string; professionalId: string }
   | { type: "HYDRATE"; state: AppState };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -191,6 +192,20 @@ function reducer(state: AppState, action: Action): AppState {
         pendingConsultationSourceLabel: null,
         pendingProfessionalId: null,
       };
+    case "START_CONVERSATION":
+      return {
+        ...state,
+        conversations: [
+          ...state.conversations,
+          {
+            id: action.conversationId,
+            professionalId: action.professionalId,
+            lastMessage: "",
+            lastMessageAt: new Date().toISOString(),
+            unreadCount: 0,
+          },
+        ],
+      };
     default:
       return state;
   }
@@ -220,6 +235,8 @@ interface AppContextValue extends AppState {
   updateMedicalNote: (id: string, text: string) => void;
   sendMessage: (conversationId: string, text: string) => void;
   retryLastMessage: (conversationId: string) => void;
+  /** Returns the id of the (possibly newly-created) conversation with this professional. */
+  startConversation: (professionalId: string) => string;
   markConversationRead: (conversationId: string) => void;
   setPendingConsultation: (
     consultationType: ConsultationType | null,
@@ -359,6 +376,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const failed = chatErrors[conversationId];
         if (!failed) return;
         void performReply(conversationId, failed.text, true);
+      },
+      startConversation: (professionalId) => {
+        const existing = state.conversations.find((c) => c.professionalId === professionalId);
+        if (existing) return existing.id;
+        const conversationId = generateId("conv");
+        dispatch({ type: "START_CONVERSATION", conversationId, professionalId });
+        return conversationId;
       },
       markConversationRead: (conversationId) =>
         dispatch({ type: "MARK_CONVERSATION_READ", conversationId }),

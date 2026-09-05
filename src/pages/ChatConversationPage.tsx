@@ -1,4 +1,4 @@
-import { AlertCircle, Phone, Send, Video } from "lucide-react";
+import { AlertCircle, MessageCircle, Phone, Send, Video } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Header } from "../components/layout/Header";
@@ -6,6 +6,7 @@ import { MessageBubble } from "../components/chat/MessageBubble";
 import { TypingIndicator } from "../components/chat/TypingIndicator";
 import { HealthProfessionalCard } from "../components/professionals/HealthProfessionalCard";
 import { Button } from "../components/ui/Button";
+import { EmptyState } from "../components/ui/EmptyState";
 import { useApp } from "../context/AppContext";
 import { getProfessional } from "../data";
 
@@ -99,6 +100,13 @@ export function ChatConversationPage() {
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
+          {thread.length === 0 && !isPending && !chatError && (
+            <EmptyState
+              icon={MessageCircle}
+              title="Start the conversation"
+              description={`Send a message to start chatting with ${professional.name}.`}
+            />
+          )}
           {thread.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))}
