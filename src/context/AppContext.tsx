@@ -588,7 +588,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       startAIIntake: () => {
         const conversationId = generateId("conv");
         const openingMessage =
-          "Hi, I'm the MyCampusCare AI Health Assistant. I'm not a doctor, but I'll ask you a few questions about what you're experiencing so I can help connect you with the right healthcare professional here at MyCampusCare. What's going on today?";
+          "Hi, I'm the MyCampusDoc AI Health Assistant. I'm not a doctor, but I'll ask you a few questions about what you're experiencing so I can help connect you with the right healthcare professional here at MyCampusDoc. What's going on today?";
         dispatch({ type: "START_AI_INTAKE", conversationId, openingMessage });
         return conversationId;
       },

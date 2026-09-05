@@ -41,7 +41,7 @@ export function ChatPage() {
         <EmptyState
           icon={MessageCircle}
           title="No conversations yet"
-          description="Start a new chat with the MyCampusCare AI health assistant to get connected with the right professional."
+          description="Start a new chat with the MyCampusDoc AI health assistant to get connected with the right professional."
           action={
             <button
               type="button"

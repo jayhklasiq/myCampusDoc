@@ -7,7 +7,7 @@ export type ChatPersona = HealthProfessional & { isAI: boolean };
 
 export const AI_ASSISTANT_PERSONA: ChatPersona = {
   id: "ai_health_assistant",
-  name: "MyCampusCare AI",
+  name: "MyCampusDoc AI",
   title: "Health Assistant",
   specialty: "AI-guided health intake & routing — not a doctor",
   clinicianType: "general_practitioner",

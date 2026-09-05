@@ -1,4 +1,4 @@
-const STORAGE_KEY = "mycampuscare.state.v1";
+const STORAGE_KEY = "mycampusdoc.state.v1";
 
 export function loadState<T>(): T | null {
   try {

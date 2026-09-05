@@ -39,7 +39,7 @@ function AppRoutes() {
   // the routes before then would let a guard judge an already-logged-in student as
   // signed out and bounce them to /signup, so hold a beat until state is known.
   if (!isHydrated) {
-    return <LoadingState fullScreen label="Loading MyCampusCare..." />;
+    return <LoadingState fullScreen label="Loading MyCampusDoc..." />;
   }
 
   return (

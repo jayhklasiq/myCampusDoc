@@ -86,7 +86,7 @@ export function PaymentPage() {
               <h1 className="text-2xl font-bold text-ink-900">Choose your plan</h1>
               <p className="mt-1.5 text-sm text-ink-500">
                 {user ? `${user.fullName.split(" ")[0]}, choose` : "Choose"} how you'd like to pay
-                for unlimited access to MyCampusCare.
+                for unlimited access to MyCampusDoc.
               </p>
             </div>
 

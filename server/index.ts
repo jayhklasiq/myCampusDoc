@@ -41,5 +41,5 @@ if (process.env.NODE_ENV === "production") {
 }
 
 app.listen(PORT, () => {
-  console.log(`[server] MyCampusCare API listening on http://localhost:${PORT}`);
+  console.log(`[server] MyCampusDoc API listening on http://localhost:${PORT}`);
 });

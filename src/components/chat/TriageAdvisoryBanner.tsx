@@ -18,7 +18,7 @@ const COPY = {
   emergency: {
     icon: Siren,
     title: "This may be a medical emergency",
-    body: "Please seek immediate emergency care — call your local emergency number or go to the nearest emergency room now rather than waiting for a MyCampusCare consultation.",
+    body: "Please seek immediate emergency care — call your local emergency number or go to the nearest emergency room now rather than waiting for a MyCampusDoc consultation.",
     container: "border-danger-200 bg-danger-50 text-danger-700",
     iconWrap: "bg-danger-500/15 text-danger-600",
   },
@@ -41,7 +41,7 @@ export function TriageAdvisoryBanner({ level, onFindClinician }: TriageAdvisoryB
       </div>
       {level === "urgent" && onFindClinician && (
         <Button type="button" size="sm" variant="secondary" className="self-start" onClick={onFindClinician}>
-          Still want a MyCampusCare consultation? Find a clinician
+          Still want a MyCampusDoc consultation? Find a clinician
         </Button>
       )}
     </div>

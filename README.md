@@ -1,6 +1,6 @@
-# MyCampusCare — Product Demo
+# MyCampusDoc — Product Demo
 
-An interactive product demo of MyCampusCare, a student healthcare consultation
+An interactive product demo of MyCampusDoc, a student healthcare consultation
 platform. It walks through the full student journey — sign up, choose a
 payment plan, subscribe, chat with a health professional, schedule an audio
 or video consultation, and review consultation history. Payments, video/audio
