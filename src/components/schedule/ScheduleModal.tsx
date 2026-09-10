@@ -5,14 +5,18 @@ import { AppointmentCard } from "./AppointmentCard";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
-import { availableTimeSlots, professionals } from "../../data";
+import { availableTimeSlots } from "../../data";
+import { getBookableSlotsForDate } from "../../lib/availability";
 import { formatDayLabel } from "../../lib/format";
-import type { Appointment, ConsultationType } from "../../types";
+import type { Appointment, AvailabilityRange, ConsultationType, HealthProfessional } from "../../types";
 
 interface ScheduleModalProps {
   open: boolean;
   date: string | null;
   existingAppointments: Appointment[];
+  allAppointments: Appointment[];
+  availabilityRanges: AvailabilityRange[];
+  professionals: HealthProfessional[];
   initialConsultationType?: ConsultationType | null;
   initialProfessionalId?: string | null;
   sourceLabel?: string | null;
@@ -25,21 +29,13 @@ interface ScheduleModalProps {
   }) => Appointment;
 }
 
-function getUnavailableSlots(dateStr: string): Set<string> {
-  let hash = 0;
-  for (let i = 0; i < dateStr.length; i++) hash = (hash * 31 + dateStr.charCodeAt(i)) >>> 0;
-  const count = 1 + (hash % 2);
-  const indices = new Set<number>();
-  for (let i = 0; i < count; i++) {
-    indices.add((hash + i * 3) % availableTimeSlots.length);
-  }
-  return new Set([...indices].map((i) => availableTimeSlots[i]));
-}
-
 export function ScheduleModal({
   open,
   date,
   existingAppointments,
+  allAppointments,
+  availabilityRanges,
+  professionals,
   initialConsultationType,
   initialProfessionalId,
   sourceLabel,
@@ -69,10 +65,14 @@ export function ScheduleModal({
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const isPastDate = date < todayStr;
-  const unavailable = getUnavailableSlots(date);
-  const bookedTimes = new Set(existingAppointments.map((a) => a.time));
   const assignedProfessional =
     professionals.find((p) => p.id === initialProfessionalId) ?? professionals[0];
+  // Real, doctor-set weekly availability intersected with actual booked
+  // appointments — never invented. See lib/availability.ts.
+  const slotStatuses = assignedProfessional
+    ? getBookableSlotsForDate(assignedProfessional.id, date, allAppointments, availabilityRanges)
+    : [];
+  const slotStatusMap = new Map(slotStatuses.map((s) => [s.time, s.status]));
 
   const upcomingOnDate = existingAppointments.filter((a) => a.status === "upcoming");
   const pastOnDate = existingAppointments.filter((a) => a.status !== "upcoming");
@@ -124,7 +124,7 @@ export function ScheduleModal({
               </p>
               <div className="flex flex-col gap-2">
                 {[...upcomingOnDate, ...pastOnDate].map((appt) => (
-                  <AppointmentCard key={appt.id} appointment={appt} />
+                  <AppointmentCard key={appt.id} appointment={appt} professionals={professionals} />
                 ))}
               </div>
             </div>
@@ -142,21 +142,30 @@ export function ScheduleModal({
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {availableTimeSlots.map((slot) => {
-                    const isBooked = bookedTimes.has(slot) || unavailable.has(slot);
+                    const status = slotStatusMap.get(slot) ?? "unavailable";
+                    const isSelectable = status === "available";
                     const isSelected = selectedTime === slot;
                     return (
                       <button
                         key={slot}
                         type="button"
-                        disabled={isBooked}
+                        disabled={!isSelectable}
+                        title={
+                          status === "booked"
+                            ? "Already booked"
+                            : status === "unavailable"
+                              ? "Outside this clinician's hours"
+                              : undefined
+                        }
                         onClick={() => {
                           setSelectedTime(slot);
                           setError(null);
                         }}
                         className={clsx(
                           "rounded-xl border px-2 py-2.5 text-xs font-semibold transition-colors",
-                          isBooked && "cursor-not-allowed border-ink-100 bg-ink-50 text-ink-300 line-through",
-                          !isBooked &&
+                          !isSelectable &&
+                            "cursor-not-allowed border-ink-100 bg-ink-50 text-ink-300 line-through",
+                          isSelectable &&
                             !isSelected &&
                             "border-ink-200 text-ink-700 hover:border-brand-300",
                           isSelected && "border-brand-600 bg-brand-600 text-white",
@@ -167,6 +176,12 @@ export function ScheduleModal({
                     );
                   })}
                 </div>
+                {slotStatuses.every((s) => s.status !== "available") && (
+                  <p className="mt-2 text-xs text-ink-500">
+                    {assignedProfessional?.name ?? "This clinician"} has no open hours on this date.
+                    Try another date.
+                  </p>
+                )}
                 {error && <p className="mt-2 text-xs font-medium text-danger-600">{error}</p>}
               </div>
 

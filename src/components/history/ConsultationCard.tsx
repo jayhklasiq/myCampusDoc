@@ -2,17 +2,18 @@ import { Phone, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
-import { getProfessional } from "../../data";
+import { findProfessionalById } from "../../data";
 import { formatDateLong } from "../../lib/format";
-import type { Consultation } from "../../types";
+import type { Consultation, HealthProfessional } from "../../types";
 
 interface ConsultationCardProps {
   consultation: Consultation;
+  professionals: HealthProfessional[];
 }
 
-export function ConsultationCard({ consultation }: ConsultationCardProps) {
+export function ConsultationCard({ consultation, professionals }: ConsultationCardProps) {
   const navigate = useNavigate();
-  const professional = getProfessional(consultation.professionalId);
+  const professional = findProfessionalById(professionals, consultation.professionalId);
   if (!professional) return null;
   const TypeIcon = consultation.consultationType === "video" ? Video : Phone;
 

@@ -6,6 +6,25 @@ export interface User {
   phone: string;
 }
 
+/** The three application roles sharing this one demo project (see routes/guards.tsx). */
+export type UserRole = "student" | "doctor" | "hivecare_admin";
+
+/**
+ * A practitioner's professional credential level, as entered by HiveCare during
+ * onboarding. Kept separate from `specialty`/`clinicianType` (what they treat) —
+ * this is what kind of clinician they are.
+ */
+export type ProfessionalLevel =
+  | "General Practitioner"
+  | "Specialist"
+  | "Nurse Practitioner"
+  | "Physician Assistant"
+  | "Psychologist"
+  | "Dentist";
+
+/** Where a practitioner sits in HiveCare's onboarding lifecycle. */
+export type PractitionerStatus = "invitation_sent" | "active" | "inactive";
+
 // Normalized clinician categories the AI intake can route a student to. Kept
 // as a closed set (rather than freeform AI text) so routing can be validated
 // server-side and matched against the app's real practitioner data — the AI
@@ -77,6 +96,15 @@ export interface Subscription {
   status: "active";
 }
 
+/**
+ * A practitioner record. This doubles as both the student-facing "clinician
+ * card" shape (name/title/specialty/avatar — unchanged from before the
+ * multi-role platform) AND the HiveCare/Doctor-portal administrative record
+ * (firstName/lastName/email/phone/address/professionalLevel/status) — kept as
+ * one extended type rather than a second parallel `Practitioner` model so
+ * students, doctors, and HiveCare all read the exact same data and can never
+ * drift apart (see AppContext: `professionals` lives in shared reducer state).
+ */
 export interface HealthProfessional {
   id: string;
   name: string;
@@ -86,6 +114,52 @@ export interface HealthProfessional {
   avatar: string;
   online: boolean;
   availabilityNote: string;
+
+  // HiveCare-managed administrative fields (see PART 17/22 of the multi-role spec).
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  professionalLevel: ProfessionalLevel;
+  status: PractitionerStatus;
+  /** Set when HiveCare onboards the practitioner (invitation generated). */
+  invitedAt: string;
+  /** Set the first time the practitioner completes doctor-portal login. */
+  activatedAt?: string;
+}
+
+/**
+ * One weekly-recurring block of time a practitioner has marked themselves
+ * available. A day with no ranges for a given practitioner is implicitly
+ * "Unavailable" that day — there's no separate "unavailable" record to keep
+ * in sync. This is the single source of truth student scheduling reads from
+ * (see lib/availability.ts) — the AI/app must never invent availability.
+ */
+export interface AvailabilityRange {
+  id: string;
+  practitionerId: string;
+  /** 0 = Sunday ... 6 = Saturday, matching Date#getDay(). */
+  dayOfWeek: number;
+  /** e.g. "9:00 AM" — drawn from the same time labels used across scheduling. */
+  startTime: string;
+  /** Exclusive upper bound, e.g. "12:00 PM". */
+  endTime: string;
+}
+
+/**
+ * A simulated outbound email — the demo's stand-in for a real email provider.
+ * Both HiveCare's onboarding invitation and the doctor login's verification
+ * code are represented as one of these rather than two hard-coded fake
+ * behaviors, so the mechanism (and its dev-only inbox at /dev/emails) is reusable.
+ */
+export interface DemoEmail {
+  id: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  type: "onboarding" | "verification";
+  createdAt: string;
 }
 
 export interface Message {
@@ -109,7 +183,10 @@ export interface Conversation {
   recommendedProfessionalIds?: string[];
   lastMessage: string;
   lastMessageAt: string;
+  /** Unread-by-student count (existing field — unchanged meaning). */
   unreadCount: number;
+  /** Unread-by-doctor count, shown in the Doctor Portal's Messages page/badges. */
+  unreadByProfessionalCount: number;
 }
 
 export type AppointmentStatus = "upcoming" | "completed" | "cancelled";

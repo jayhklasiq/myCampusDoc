@@ -5,7 +5,7 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { useApp } from "../context/AppContext";
 
 export function HistoryPage() {
-  const { consultations } = useApp();
+  const { consultations, professionals } = useApp();
   const sorted = [...consultations].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
@@ -22,7 +22,11 @@ export function HistoryPage() {
       ) : (
         <div className="flex flex-col gap-3 px-4 py-4">
           {sorted.map((consultation) => (
-            <ConsultationCard key={consultation.id} consultation={consultation} />
+            <ConsultationCard
+              key={consultation.id}
+              consultation={consultation}
+              professionals={professionals}
+            />
           ))}
         </div>
       )}

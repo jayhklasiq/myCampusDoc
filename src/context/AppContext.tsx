@@ -9,26 +9,42 @@ import {
 } from "react";
 import {
   initialAppointments,
+  initialAvailabilityRanges,
   initialConsultations,
   initialConversations,
   initialMessages,
+  initialProfessionals,
 } from "../data";
 import { requestChatResponse, type ChatApiTurn, type ChatMode } from "../lib/chatApi";
 import { findAvailableClinicians } from "../lib/clinicianMatching";
 import { generateId } from "../lib/id";
+import { isValidRange, rangeHasConflict, rangesOverlap } from "../lib/availability";
+import {
+  buildOnboardingEmailContent,
+  buildVerificationEmailContent,
+  generateVerificationCode,
+  newDemoEmail,
+} from "../lib/demoEmail";
+import { PROFESSIONAL_LEVEL_TITLE } from "../lib/practitionerOptions";
 import { loadState, saveState } from "../lib/storage";
-import { buildIntakeSummaryText } from "../lib/triage";
+import { buildIntakeSummaryText, CLINICIAN_TYPE_LABELS } from "../lib/triage";
 import type {
   AiTriageRecord,
   Appointment,
+  AvailabilityRange,
   ChatStage,
   ClinicianType,
   Consultation,
   Conversation,
   ConsultationType,
+  DemoEmail,
+  HealthProfessional,
   MedicalNote,
   Message,
   PlanId,
+  Prescription,
+  ProfessionalLevel,
+  PractitionerStatus,
   Subscription,
   TriageResult,
   User,
@@ -37,6 +53,20 @@ import type {
 interface Credentials {
   email: string;
   password: string;
+}
+
+interface DoctorSession {
+  practitionerId: string;
+}
+
+interface HivecareSession {
+  adminName: string;
+}
+
+interface PendingDoctorVerification {
+  email: string;
+  practitionerId: string;
+  code: string;
 }
 
 interface AppState {
@@ -55,6 +85,17 @@ interface AppState {
   /** Set when scheduling was reached via an AI-intake "View Times" card, so
    * CREATE_APPOINTMENT knows which conversation to hand the booking back to. */
   pendingIntakeConversationId: string | null;
+
+  // --- Multi-role platform state (shared by student, doctor, and HiveCare) ---
+  /** The single practitioner roster — read identically by all three roles. */
+  professionals: HealthProfessional[];
+  /** Weekly-recurring availability each practitioner has set (PART 9/10). */
+  availabilityRanges: AvailabilityRange[];
+  /** Simulated outbound emails (onboarding invitations + verification codes). */
+  demoEmails: DemoEmail[];
+  doctorSession: DoctorSession | null;
+  hivecareSession: HivecareSession | null;
+  pendingDoctorVerification: PendingDoctorVerification | null;
 }
 
 const initialState: AppState = {
@@ -71,6 +112,12 @@ const initialState: AppState = {
   pendingConsultationSourceLabel: null,
   pendingProfessionalId: null,
   pendingIntakeConversationId: null,
+  professionals: initialProfessionals,
+  availabilityRanges: initialAvailabilityRanges,
+  demoEmails: [],
+  doctorSession: null,
+  hivecareSession: null,
+  pendingDoctorVerification: null,
 };
 
 type Action =
@@ -83,6 +130,7 @@ type Action =
   | { type: "SEND_MESSAGE"; conversationId: string; text: string }
   | { type: "RECEIVE_MESSAGE"; conversationId: string; text: string }
   | { type: "MARK_CONVERSATION_READ"; conversationId: string }
+  | { type: "MARK_CONVERSATION_READ_BY_PROFESSIONAL"; conversationId: string }
   | {
       type: "SET_PENDING_CONSULTATION";
       consultationType: ConsultationType | null;
@@ -103,6 +151,33 @@ type Action =
       triage: TriageResult | null;
     }
   | { type: "PROCEED_TO_CLINICIAN_SELECTION"; conversationId: string }
+  | { type: "ONBOARD_PRACTITIONER"; professional: HealthProfessional; email: DemoEmail }
+  | {
+      type: "REQUEST_DOCTOR_CODE";
+      email: string;
+      practitionerId: string;
+      code: string;
+      verificationEmail: DemoEmail;
+    }
+  | { type: "CANCEL_DOCTOR_VERIFICATION" }
+  | { type: "VERIFY_DOCTOR_CODE_SUCCESS"; practitionerId: string }
+  | { type: "DOCTOR_LOG_OUT" }
+  | { type: "HIVECARE_LOG_IN"; adminName: string }
+  | { type: "HIVECARE_LOG_OUT" }
+  | { type: "ADD_AVAILABILITY_RANGE"; range: AvailabilityRange }
+  | { type: "REMOVE_AVAILABILITY_RANGE"; rangeId: string }
+  | { type: "UPDATE_PRACTITIONER_CONTACT"; practitionerId: string; phone: string; address: string }
+  | { type: "SET_PRACTITIONER_STATUS"; practitionerId: string; status: PractitionerStatus }
+  | {
+      type: "COMPLETE_CONSULTATION";
+      consultationId?: string;
+      appointment?: Appointment;
+      summary: string;
+      diagnosis: string | null;
+      prescriptions: Prescription[];
+      tests: string[];
+      followUpAppointmentId: string | null;
+    }
   | { type: "HYDRATE"; state: AppState };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -161,7 +236,16 @@ function reducer(state: AppState, action: Action): AppState {
         messages: [...state.messages, message],
         conversations: state.conversations.map((c) =>
           c.id === action.conversationId
-            ? { ...c, lastMessage: action.text, lastMessageAt: message.timestamp }
+            ? {
+                ...c,
+                lastMessage: action.text,
+                lastMessageAt: message.timestamp,
+                // A real practitioner is attached once stage is past AI intake —
+                // that's the doctor's own inbox unread count (PART 16), tracked
+                // independently of the student-facing `unreadCount` above.
+                unreadByProfessionalCount:
+                  c.professionalId !== null ? c.unreadByProfessionalCount + 1 : c.unreadByProfessionalCount,
+              }
             : c,
         ),
       };
@@ -194,6 +278,13 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         conversations: state.conversations.map((c) =>
           c.id === action.conversationId ? { ...c, unreadCount: 0 } : c,
+        ),
+      };
+    case "MARK_CONVERSATION_READ_BY_PROFESSIONAL":
+      return {
+        ...state,
+        conversations: state.conversations.map((c) =>
+          c.id === action.conversationId ? { ...c, unreadByProfessionalCount: 0 } : c,
         ),
       };
     case "SET_PENDING_CONSULTATION":
@@ -296,6 +387,7 @@ function reducer(state: AppState, action: Action): AppState {
             lastMessage: "",
             lastMessageAt: new Date().toISOString(),
             unreadCount: 0,
+            unreadByProfessionalCount: 0,
           },
         ],
       };
@@ -308,6 +400,7 @@ function reducer(state: AppState, action: Action): AppState {
         lastMessage: action.openingMessage,
         lastMessageAt: now,
         unreadCount: 0,
+        unreadByProfessionalCount: 0,
       };
       const openingMessageRecord: Message = {
         id: generateId("msg"),
@@ -348,7 +441,10 @@ function reducer(state: AppState, action: Action): AppState {
             if (action.triage.status === "complete") {
               const clinicianType: ClinicianType =
                 action.triage.clinicianType ?? "general_practitioner";
-              recommendedProfessionalIds = findAvailableClinicians(clinicianType).map((p) => p.id);
+              recommendedProfessionalIds = findAvailableClinicians(
+                clinicianType,
+                state.professionals,
+              ).map((p) => p.id);
               stage = "clinician_selection";
             } else if (action.triage.status === "urgent") {
               stage = "urgent_advisory";
@@ -378,10 +474,128 @@ function reducer(state: AppState, action: Action): AppState {
           return {
             ...c,
             stage: "clinician_selection",
-            recommendedProfessionalIds: findAvailableClinicians(clinicianType).map((p) => p.id),
+            recommendedProfessionalIds: findAvailableClinicians(
+              clinicianType,
+              state.professionals,
+            ).map((p) => p.id),
           };
         }),
       };
+    case "ONBOARD_PRACTITIONER":
+      return {
+        ...state,
+        professionals: [...state.professionals, action.professional],
+        demoEmails: [...state.demoEmails, action.email],
+      };
+    case "REQUEST_DOCTOR_CODE":
+      return {
+        ...state,
+        pendingDoctorVerification: {
+          email: action.email,
+          practitionerId: action.practitionerId,
+          code: action.code,
+        },
+        demoEmails: [...state.demoEmails, action.verificationEmail],
+      };
+    case "CANCEL_DOCTOR_VERIFICATION":
+      return { ...state, pendingDoctorVerification: null };
+    case "VERIFY_DOCTOR_CODE_SUCCESS": {
+      const now = new Date().toISOString();
+      return {
+        ...state,
+        doctorSession: { practitionerId: action.practitionerId },
+        pendingDoctorVerification: null,
+        professionals: state.professionals.map((p) =>
+          p.id === action.practitionerId
+            ? {
+                ...p,
+                status: "active" as const,
+                activatedAt: p.activatedAt ?? now,
+                online: true,
+                availabilityNote: p.availabilityNote === "Invitation sent — awaiting first login"
+                  ? "Available — set your hours"
+                  : p.availabilityNote,
+              }
+            : p,
+        ),
+      };
+    }
+    case "DOCTOR_LOG_OUT":
+      return { ...state, doctorSession: null };
+    case "HIVECARE_LOG_IN":
+      return { ...state, hivecareSession: { adminName: action.adminName } };
+    case "HIVECARE_LOG_OUT":
+      return { ...state, hivecareSession: null };
+    case "ADD_AVAILABILITY_RANGE":
+      return { ...state, availabilityRanges: [...state.availabilityRanges, action.range] };
+    case "REMOVE_AVAILABILITY_RANGE":
+      return {
+        ...state,
+        availabilityRanges: state.availabilityRanges.filter((r) => r.id !== action.rangeId),
+      };
+    case "UPDATE_PRACTITIONER_CONTACT":
+      return {
+        ...state,
+        professionals: state.professionals.map((p) =>
+          p.id === action.practitionerId ? { ...p, phone: action.phone, address: action.address } : p,
+        ),
+      };
+    case "SET_PRACTITIONER_STATUS":
+      return {
+        ...state,
+        professionals: state.professionals.map((p) =>
+          p.id === action.practitionerId ? { ...p, status: action.status } : p,
+        ),
+      };
+    case "COMPLETE_CONSULTATION": {
+      if (action.consultationId) {
+        const existing = state.consultations.find((c) => c.id === action.consultationId);
+        if (!existing) return state;
+        const updated: Consultation = {
+          ...existing,
+          status: "completed",
+          summary: action.summary,
+          diagnosis: action.diagnosis,
+          prescriptions: action.prescriptions,
+          tests: action.tests,
+          followUpAppointmentId: action.followUpAppointmentId,
+        };
+        return {
+          ...state,
+          consultations: state.consultations.map((c) => (c.id === updated.id ? updated : c)),
+          appointments: existing.appointmentId
+            ? state.appointments.map((a) =>
+                a.id === existing.appointmentId ? { ...a, status: "completed" as const } : a,
+              )
+            : state.appointments,
+        };
+      }
+      if (action.appointment) {
+        const appointment = action.appointment;
+        const newConsultation: Consultation = {
+          id: generateId("consult"),
+          date: appointment.date,
+          time: appointment.time,
+          professionalId: appointment.professionalId,
+          consultationType: appointment.consultationType,
+          status: "completed",
+          summary: action.summary,
+          diagnosis: action.diagnosis,
+          prescriptions: action.prescriptions,
+          tests: action.tests,
+          followUpAppointmentId: action.followUpAppointmentId,
+          appointmentId: appointment.id,
+        };
+        return {
+          ...state,
+          consultations: [...state.consultations, newConsultation],
+          appointments: state.appointments.map((a) =>
+            a.id === appointment.id ? { ...a, status: "completed" as const } : a,
+          ),
+        };
+      }
+      return state;
+    }
     default:
       return state;
   }
@@ -392,6 +606,21 @@ export interface ChatError {
   text: string;
   /** Safe, user-facing message (already sanitized server-side). */
   message: string;
+}
+
+export interface DoctorAuthResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface OnboardPractitionerInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  professionalLevel: ProfessionalLevel;
+  clinicianType: ClinicianType;
 }
 
 interface AppContextValue extends AppState {
@@ -431,6 +660,40 @@ interface AppContextValue extends AppState {
     consultationType: ConsultationType;
     needToKnow: string;
   }) => Appointment;
+
+  // --- Doctor Portal ---
+  requestDoctorCode: (email: string) => DoctorAuthResult;
+  resendDoctorCode: () => DoctorAuthResult;
+  verifyDoctorCode: (code: string) => DoctorAuthResult;
+  cancelDoctorVerification: () => void;
+  doctorLogOut: () => void;
+  addAvailabilityRange: (
+    practitionerId: string,
+    dayOfWeek: number,
+    startTime: string,
+    endTime: string,
+  ) => { success: boolean; error?: string };
+  removeAvailabilityRange: (rangeId: string) => { success: boolean; error?: string };
+  updatePractitionerContact: (practitionerId: string, phone: string, address: string) => void;
+  completeConsultation: (input: {
+    consultationId?: string;
+    appointment?: Appointment;
+    summary: string;
+    diagnosis: string | null;
+    prescriptions: Prescription[];
+    tests: string[];
+    followUpAppointmentId: string | null;
+  }) => void;
+  sendDoctorMessage: (conversationId: string, text: string) => void;
+  markConversationReadByProfessional: (conversationId: string) => void;
+
+  // --- HiveCare Admin Portal ---
+  hivecareLogIn: (adminName: string) => void;
+  hivecareLogOut: () => void;
+  onboardPractitioner: (
+    input: OnboardPractitionerInput,
+  ) => { success: boolean; error?: string; professional?: HealthProfessional };
+  setPractitionerStatus: (practitionerId: string, status: PractitionerStatus) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -526,6 +789,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return next;
       });
     }
+  }
+
+  function issueDoctorCode(email: string, practitionerId: string): DoctorAuthResult {
+    const code = generateVerificationCode();
+    const verificationEmail = newDemoEmail(
+      email,
+      buildVerificationEmailContent(code),
+      "verification",
+      generateId("email"),
+      new Date().toISOString(),
+    );
+    dispatch({ type: "REQUEST_DOCTOR_CODE", email, practitionerId, code, verificationEmail });
+    return { success: true };
   }
 
   const value = useMemo<AppContextValue>(
@@ -632,9 +908,129 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "CREATE_APPOINTMENT", appointment });
         return appointment;
       },
+
+      // --- Doctor Portal ---
+      requestDoctorCode: (email) => {
+        const normalized = email.trim().toLowerCase();
+        const practitioner = state.professionals.find((p) => p.email.toLowerCase() === normalized);
+        if (!practitioner) {
+          return {
+            success: false,
+            error: "No practitioner found with that email. Contact HiveCare if this seems wrong.",
+          };
+        }
+        if (practitioner.status === "inactive") {
+          return { success: false, error: "This account is inactive. Contact HiveCare." };
+        }
+        return issueDoctorCode(practitioner.email, practitioner.id);
+      },
+      resendDoctorCode: () => {
+        const pending = state.pendingDoctorVerification;
+        if (!pending) return { success: false, error: "Start over with your email address." };
+        return issueDoctorCode(pending.email, pending.practitionerId);
+      },
+      verifyDoctorCode: (code) => {
+        const pending = state.pendingDoctorVerification;
+        if (!pending) return { success: false, error: "Start over with your email address." };
+        if (code.trim() !== pending.code) {
+          return { success: false, error: "Incorrect code. Please try again." };
+        }
+        dispatch({ type: "VERIFY_DOCTOR_CODE_SUCCESS", practitionerId: pending.practitionerId });
+        return { success: true };
+      },
+      cancelDoctorVerification: () => dispatch({ type: "CANCEL_DOCTOR_VERIFICATION" }),
+      doctorLogOut: () => dispatch({ type: "DOCTOR_LOG_OUT" }),
+      addAvailabilityRange: (practitionerId, dayOfWeek, startTime, endTime) => {
+        if (!isValidRange(startTime, endTime)) {
+          return { success: false, error: "End time must be after start time." };
+        }
+        const overlapsExisting = state.availabilityRanges.some(
+          (r) =>
+            r.practitionerId === practitionerId &&
+            r.dayOfWeek === dayOfWeek &&
+            rangesOverlap(startTime, endTime, r.startTime, r.endTime),
+        );
+        if (overlapsExisting) {
+          return { success: false, error: "This overlaps a block you've already set for that day." };
+        }
+        dispatch({
+          type: "ADD_AVAILABILITY_RANGE",
+          range: { id: generateId("avail"), practitionerId, dayOfWeek, startTime, endTime },
+        });
+        return { success: true };
+      },
+      removeAvailabilityRange: (rangeId) => {
+        const range = state.availabilityRanges.find((r) => r.id === rangeId);
+        if (!range) return { success: false, error: "That availability block no longer exists." };
+        if (
+          rangeHasConflict(
+            range.practitionerId,
+            range.dayOfWeek,
+            range.startTime,
+            range.endTime,
+            state.appointments,
+          )
+        ) {
+          return {
+            success: false,
+            error: "Can't remove this block — it has a confirmed consultation. Reschedule or cancel that consultation first.",
+          };
+        }
+        dispatch({ type: "REMOVE_AVAILABILITY_RANGE", rangeId });
+        return { success: true };
+      },
+      updatePractitionerContact: (practitionerId, phone, address) =>
+        dispatch({ type: "UPDATE_PRACTITIONER_CONTACT", practitionerId, phone, address }),
+      completeConsultation: (input) => dispatch({ type: "COMPLETE_CONSULTATION", ...input }),
+      sendDoctorMessage: (conversationId, text) => {
+        dispatch({ type: "RECEIVE_MESSAGE", conversationId, text });
+      },
+      markConversationReadByProfessional: (conversationId) =>
+        dispatch({ type: "MARK_CONVERSATION_READ_BY_PROFESSIONAL", conversationId }),
+
+      // --- HiveCare Admin Portal ---
+      hivecareLogIn: (adminName) =>
+        dispatch({ type: "HIVECARE_LOG_IN", adminName: adminName.trim() || "HiveCare Admin" }),
+      hivecareLogOut: () => dispatch({ type: "HIVECARE_LOG_OUT" }),
+      onboardPractitioner: (input) => {
+        const normalizedEmail = input.email.trim().toLowerCase();
+        if (state.professionals.some((p) => p.email.toLowerCase() === normalizedEmail)) {
+          return { success: false, error: "A practitioner with that email already exists." };
+        }
+        const now = new Date().toISOString();
+        const professional: HealthProfessional = {
+          id: generateId("prof"),
+          name: `Dr. ${input.firstName} ${input.lastName}`,
+          title: PROFESSIONAL_LEVEL_TITLE[input.professionalLevel],
+          specialty: CLINICIAN_TYPE_LABELS[input.clinicianType],
+          clinicianType: input.clinicianType,
+          avatar: `${input.firstName[0] ?? ""}${input.lastName[0] ?? ""}`.toUpperCase(),
+          online: false,
+          availabilityNote: "Invitation sent — awaiting first login",
+          firstName: input.firstName.trim(),
+          lastName: input.lastName.trim(),
+          email: normalizedEmail,
+          phone: input.phone.trim(),
+          address: input.address.trim(),
+          professionalLevel: input.professionalLevel,
+          status: "invitation_sent",
+          invitedAt: now,
+        };
+        const email = newDemoEmail(
+          professional.email,
+          buildOnboardingEmailContent(professional),
+          "onboarding",
+          generateId("email"),
+          now,
+        );
+        dispatch({ type: "ONBOARD_PRACTITIONER", professional, email });
+        return { success: true, professional };
+      },
+      setPractitionerStatus: (practitionerId, status) =>
+        dispatch({ type: "SET_PRACTITIONER_STATUS", practitionerId, status }),
     }),
-    // performReply is a plain function redefined every render; its only real dependency
-    // (state) is already tracked below, and the setState functions are stable.
+    // performReply/issueDoctorCode are plain functions redefined every render; their only
+    // real dependency (state) is already tracked below, and the setState functions are stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, isHydrated, pendingConversationIds, chatErrors],
   );

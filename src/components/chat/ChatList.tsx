@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "../ui/Avatar";
+import { useApp } from "../../context/AppContext";
 import { getConversationPersona } from "../../lib/chatPersona";
 import { formatRelativeTimestamp } from "../../lib/format";
 import type { Conversation } from "../../types";
@@ -10,11 +11,12 @@ interface ChatListProps {
 
 export function ChatList({ conversations }: ChatListProps) {
   const navigate = useNavigate();
+  const { professionals } = useApp();
 
   return (
     <ul className="flex flex-col divide-y divide-ink-100">
       {conversations.map((conversation) => {
-        const professional = getConversationPersona(conversation);
+        const professional = getConversationPersona(conversation, professionals);
         const unread = conversation.unreadCount > 0;
 
         return (

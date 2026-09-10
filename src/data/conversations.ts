@@ -12,6 +12,7 @@ export const initialConversations: Conversation[] = [
     lastMessage: "Great, let's keep an eye on it and touch base at your follow-up.",
     lastMessageAt: iso(subMinutes(now, 12)),
     unreadCount: 2,
+    unreadByProfessionalCount: 0,
   },
   {
     id: "conv_reyes",
@@ -20,6 +21,7 @@ export const initialConversations: Conversation[] = [
     lastMessage: "The cream should help within a few days — let me know if the rash spreads.",
     lastMessageAt: iso(subHours(now, 5)),
     unreadCount: 0,
+    unreadByProfessionalCount: 0,
   },
   {
     id: "conv_okafor",
@@ -28,6 +30,7 @@ export const initialConversations: Conversation[] = [
     lastMessage: "Sounds good. Try the breathing exercise before bed and we'll check in next week.",
     lastMessageAt: iso(subDays(now, 2)),
     unreadCount: 0,
+    unreadByProfessionalCount: 1,
   },
   {
     id: "conv_kim",
@@ -36,6 +39,7 @@ export const initialConversations: Conversation[] = [
     lastMessage: "Feel free to message anytime you have questions about your meal plan.",
     lastMessageAt: iso(subDays(now, 9)),
     unreadCount: 0,
+    unreadByProfessionalCount: 0,
   },
 ];
 

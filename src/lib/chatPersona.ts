@@ -1,4 +1,4 @@
-import { getProfessional } from "../data";
+import { findProfessionalById } from "../data";
 import type { Conversation, HealthProfessional } from "../types";
 
 /** Whatever a chat conversation currently presents as — a real clinician, or
@@ -15,11 +15,24 @@ export const AI_ASSISTANT_PERSONA: ChatPersona = {
   online: true,
   availabilityNote: "Always available",
   isAI: true,
+  firstName: "MyCampusDoc",
+  lastName: "AI",
+  email: "",
+  phone: "",
+  address: "",
+  professionalLevel: "General Practitioner",
+  status: "active",
+  invitedAt: "",
 };
 
-export function getConversationPersona(conversation: Conversation): ChatPersona {
+/** `professionals` is passed in rather than imported statically because the
+ * roster lives in shared AppContext state (see lib/clinicianMatching.ts). */
+export function getConversationPersona(
+  conversation: Conversation,
+  professionals: HealthProfessional[],
+): ChatPersona {
   if (conversation.professionalId) {
-    const professional = getProfessional(conversation.professionalId);
+    const professional = findProfessionalById(professionals, conversation.professionalId);
     if (professional) return { ...professional, isAI: false };
   }
   return AI_ASSISTANT_PERSONA;

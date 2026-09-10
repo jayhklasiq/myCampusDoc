@@ -10,6 +10,8 @@ import { useApp } from "../context/AppContext";
 export function SchedulePage() {
   const {
     appointments,
+    professionals,
+    availabilityRanges,
     createAppointment,
     pendingConsultationType,
     pendingConsultationSourceLabel,
@@ -95,7 +97,12 @@ export function SchedulePage() {
           ) : (
             <div className="flex flex-col gap-2.5">
               {upcoming.map((appt) => (
-                <AppointmentCard key={appt.id} appointment={appt} showDate />
+                <AppointmentCard
+                  key={appt.id}
+                  appointment={appt}
+                  professionals={professionals}
+                  showDate
+                />
               ))}
             </div>
           )}
@@ -108,7 +115,12 @@ export function SchedulePage() {
           ) : (
             <div className="flex flex-col gap-2.5">
               {past.map((appt) => (
-                <AppointmentCard key={appt.id} appointment={appt} showDate />
+                <AppointmentCard
+                  key={appt.id}
+                  appointment={appt}
+                  professionals={professionals}
+                  showDate
+                />
               ))}
             </div>
           )}
@@ -119,6 +131,9 @@ export function SchedulePage() {
         open={modalOpen}
         date={selectedDate}
         existingAppointments={appointmentsForSelectedDate}
+        allAppointments={appointments}
+        availabilityRanges={availabilityRanges}
+        professionals={professionals}
         initialConsultationType={pendingConsultationType}
         initialProfessionalId={pendingProfessionalId}
         sourceLabel={pendingConsultationSourceLabel}

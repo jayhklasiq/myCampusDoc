@@ -2,17 +2,18 @@ import { Phone, Video } from "lucide-react";
 import clsx from "clsx";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
-import { getProfessional } from "../../data";
+import { findProfessionalById } from "../../data";
 import { formatDateShort } from "../../lib/format";
-import type { Appointment } from "../../types";
+import type { Appointment, HealthProfessional } from "../../types";
 
 interface AppointmentCardProps {
   appointment: Appointment;
+  professionals: HealthProfessional[];
   showDate?: boolean;
 }
 
-export function AppointmentCard({ appointment, showDate }: AppointmentCardProps) {
-  const professional = getProfessional(appointment.professionalId);
+export function AppointmentCard({ appointment, professionals, showDate }: AppointmentCardProps) {
+  const professional = findProfessionalById(professionals, appointment.professionalId);
   if (!professional) return null;
   const TypeIcon = appointment.consultationType === "video" ? Video : Phone;
   const isUpcoming = appointment.status === "upcoming";

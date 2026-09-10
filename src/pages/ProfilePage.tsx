@@ -18,11 +18,11 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
 import { useApp } from "../context/AppContext";
-import { getProfessional, paymentPlans } from "../data";
+import { findProfessionalById, paymentPlans } from "../data";
 import { formatDateLong } from "../lib/format";
 
 export function ProfilePage() {
-  const { user, subscription, appointments, consultations, logOut } = useApp();
+  const { user, subscription, appointments, consultations, professionals, logOut } = useApp();
   const navigate = useNavigate();
   const [logOutModalOpen, setLogOutModalOpen] = useState(false);
 
@@ -102,13 +102,13 @@ export function ProfilePage() {
               className="flex w-full items-center gap-3 rounded-xl bg-accent-50/60 p-3 text-left transition-colors hover:bg-accent-50"
             >
               <Avatar
-                initials={getProfessional(nextAppointment.professionalId)?.avatar ?? "??"}
+                initials={findProfessionalById(professionals, nextAppointment.professionalId)?.avatar ?? "??"}
                 seed={nextAppointment.professionalId}
                 size="md"
               />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-ink-900">
-                  {getProfessional(nextAppointment.professionalId)?.name}
+                  {findProfessionalById(professionals, nextAppointment.professionalId)?.name}
                 </p>
                 <p className="text-xs text-ink-500">
                   {formatDateLong(nextAppointment.date)} · {nextAppointment.time}
@@ -144,7 +144,7 @@ export function ProfilePage() {
               className="flex w-full flex-col gap-1 rounded-xl bg-ink-50 p-3 text-left transition-colors hover:bg-ink-100"
             >
               <p className="text-sm font-semibold text-ink-900">
-                {getProfessional(recentConsultation.professionalId)?.name}
+                {findProfessionalById(professionals, recentConsultation.professionalId)?.name}
               </p>
               <p className="text-xs text-ink-500">{formatDateLong(recentConsultation.date)}</p>
               <p className="line-clamp-2 text-xs leading-relaxed text-ink-500">

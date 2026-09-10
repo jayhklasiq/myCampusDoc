@@ -10,7 +10,8 @@ import { HealthProfessionalCard } from "../components/professionals/HealthProfes
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useApp } from "../context/AppContext";
-import { getProfessional } from "../data";
+import { findProfessionalById } from "../data";
+import { findNextAvailableSlot } from "../lib/availability";
 import { getConversationPersona } from "../lib/chatPersona";
 
 export function ChatConversationPage() {
@@ -19,6 +20,9 @@ export function ChatConversationPage() {
   const {
     conversations,
     messages,
+    professionals,
+    appointments,
+    availabilityRanges,
     sendMessage,
     retryLastMessage,
     pendingConversationIds,
@@ -31,7 +35,7 @@ export function ChatConversationPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const conversation = conversations.find((c) => c.id === conversationId);
-  const persona = conversation ? getConversationPersona(conversation) : undefined;
+  const persona = conversation ? getConversationPersona(conversation, professionals) : undefined;
   const isPending = !!conversationId && pendingConversationIds.has(conversationId);
   const chatError = conversationId ? chatErrors[conversationId] : undefined;
 
@@ -63,7 +67,7 @@ export function ChatConversationPage() {
   const showCallButtons = conversation.professionalId !== null;
 
   const recommendedClinicians = (conversation.recommendedProfessionalIds ?? [])
-    .map((id) => getProfessional(id))
+    .map((id) => findProfessionalById(professionals, id))
     .filter((p): p is NonNullable<typeof p> => !!p);
 
   function handleSend(e: FormEvent) {
@@ -175,6 +179,7 @@ export function ChatConversationPage() {
                 <ClinicianRecommendationCard
                   key={clinician.id}
                   professional={clinician}
+                  nextAvailable={findNextAvailableSlot(clinician.id, appointments, availabilityRanges)}
                   onViewTimes={() => handleViewTimes(clinician.id, clinician.name)}
                 />
               ))}

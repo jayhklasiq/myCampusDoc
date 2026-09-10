@@ -118,6 +118,17 @@ export function LoginPage() {
           <ShieldCheck className="h-3.5 w-3.5" />
           Demo product — use the email and password you signed up with.
         </p>
+
+        <p className="mt-6 text-center text-xs text-ink-400">
+          Healthcare provider?{" "}
+          <Link to="/doctor/login" className="font-semibold text-ink-600 hover:text-brand-600">
+            Doctor Portal
+          </Link>
+          {" · "}
+          <Link to="/hivecare/login" className="font-semibold text-ink-600 hover:text-brand-600">
+            HiveCare Admin
+          </Link>
+        </p>
       </div>
     </div>
   );

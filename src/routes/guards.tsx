@@ -44,3 +44,36 @@ export function PaymentGate({ children }: { children: ReactNode }) {
   if (wasAlreadySubscribed) return <Navigate to="/profile" replace />;
   return <>{children}</>;
 }
+
+/**
+ * Doctor Portal guards. Independent of the student auth above — a doctor
+ * session is just { practitionerId }, established via email + simulated
+ * verification code (see AppContext requestDoctorCode/verifyDoctorCode).
+ */
+export function RequireDoctorAuth({ children }: { children: ReactNode }) {
+  const { doctorSession } = useApp();
+  if (!doctorSession) return <Navigate to="/doctor/login" replace />;
+  return <>{children}</>;
+}
+
+export function DoctorLoginGate({ children }: { children: ReactNode }) {
+  const { doctorSession } = useApp();
+  if (doctorSession) return <Navigate to="/doctor/dashboard" replace />;
+  return <>{children}</>;
+}
+
+/**
+ * HiveCare Admin Portal guards. This is a demo-only admin session (no
+ * password) — see AppContext hivecareLogIn.
+ */
+export function RequireHivecareAuth({ children }: { children: ReactNode }) {
+  const { hivecareSession } = useApp();
+  if (!hivecareSession) return <Navigate to="/hivecare/login" replace />;
+  return <>{children}</>;
+}
+
+export function HivecareLoginGate({ children }: { children: ReactNode }) {
+  const { hivecareSession } = useApp();
+  if (hivecareSession) return <Navigate to="/hivecare/dashboard" replace />;
+  return <>{children}</>;
+}

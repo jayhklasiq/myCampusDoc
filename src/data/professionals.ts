@@ -1,6 +1,11 @@
 import type { HealthProfessional } from "../types";
 
-export const professionals: HealthProfessional[] = [
+// Seeded practitioner roster. Every practitioner here (existing or newly
+// added for the multi-role platform) carries the full HiveCare/doctor-portal
+// record now, since `professionals` lives in shared AppContext state and is
+// read identically by the student, doctor, and HiveCare interfaces (see
+// AppContext.tsx) — there is deliberately only one dataset.
+export const initialProfessionals: HealthProfessional[] = [
   {
     id: "prof_mensah",
     name: "Dr. Sarah Mensah",
@@ -10,6 +15,15 @@ export const professionals: HealthProfessional[] = [
     avatar: "SM",
     online: true,
     availabilityNote: "Available today until 6:00 PM",
+    firstName: "Sarah",
+    lastName: "Mensah",
+    email: "s.mensah@hivecare.health",
+    phone: "555-201-3010",
+    address: "120 Campus Health Way, Suite 4",
+    professionalLevel: "General Practitioner",
+    status: "active",
+    invitedAt: "2025-01-06T09:00:00.000Z",
+    activatedAt: "2025-01-07T14:00:00.000Z",
   },
   {
     id: "prof_okafor",
@@ -20,6 +34,15 @@ export const professionals: HealthProfessional[] = [
     avatar: "CO",
     online: false,
     availabilityNote: "Next available tomorrow, 9:00 AM",
+    firstName: "Chidi",
+    lastName: "Okafor",
+    email: "c.okafor@hivecare.health",
+    phone: "555-201-3022",
+    address: "120 Campus Health Way, Suite 7",
+    professionalLevel: "Specialist",
+    status: "active",
+    invitedAt: "2025-01-06T09:05:00.000Z",
+    activatedAt: "2025-01-08T10:00:00.000Z",
   },
   {
     id: "prof_reyes",
@@ -30,6 +53,15 @@ export const professionals: HealthProfessional[] = [
     avatar: "MR",
     online: true,
     availabilityNote: "Available today until 4:00 PM",
+    firstName: "Maria",
+    lastName: "Reyes",
+    email: "m.reyes@hivecare.health",
+    phone: "555-201-3035",
+    address: "120 Campus Health Way, Suite 2",
+    professionalLevel: "Specialist",
+    status: "active",
+    invitedAt: "2025-01-06T09:10:00.000Z",
+    activatedAt: "2025-01-09T11:00:00.000Z",
   },
   {
     id: "prof_kim",
@@ -40,9 +72,81 @@ export const professionals: HealthProfessional[] = [
     avatar: "DK",
     online: false,
     availabilityNote: "Available Monday, 10:00 AM",
+    firstName: "Daniel",
+    lastName: "Kim",
+    email: "d.kim@hivecare.health",
+    phone: "555-201-3048",
+    address: "120 Campus Health Way, Suite 9",
+    professionalLevel: "Nurse Practitioner",
+    status: "active",
+    invitedAt: "2025-01-06T09:15:00.000Z",
+    activatedAt: "2025-01-10T13:00:00.000Z",
+  },
+  // Newly onboarded via the HiveCare demo flow — demonstrates a fully
+  // available practitioner, a practitioner with limited weekly hours, and a
+  // practitioner who has been onboarded but never logged in yet (matching
+  // the multi-role spec's own worked example of an "Unavailable" clinician).
+  {
+    id: "prof_johnson",
+    name: "Dr. Sarah Johnson",
+    title: "MD",
+    specialty: "General Practice",
+    clinicianType: "general_practitioner",
+    avatar: "SJ",
+    online: true,
+    availabilityNote: "Available most weekdays",
+    firstName: "Sarah",
+    lastName: "Johnson",
+    email: "s.johnson@hivecare.health",
+    phone: "555-201-3061",
+    address: "120 Campus Health Way, Suite 5",
+    professionalLevel: "General Practitioner",
+    status: "active",
+    invitedAt: "2026-08-15T09:00:00.000Z",
+    activatedAt: "2026-08-16T10:00:00.000Z",
+  },
+  {
+    id: "prof_brown",
+    name: "Dr. Michael Brown",
+    title: "MD",
+    specialty: "Cardiology",
+    clinicianType: "cardiologist",
+    avatar: "MB",
+    online: false,
+    availabilityNote: "Limited availability this week",
+    firstName: "Michael",
+    lastName: "Brown",
+    email: "m.brown@hivecare.health",
+    phone: "555-201-3074",
+    address: "120 Campus Health Way, Suite 11",
+    professionalLevel: "Specialist",
+    status: "active",
+    invitedAt: "2026-08-20T09:00:00.000Z",
+    activatedAt: "2026-08-21T15:00:00.000Z",
+  },
+  {
+    id: "prof_wilson",
+    name: "Dr. James Wilson",
+    title: "MD",
+    specialty: "General Practice",
+    clinicianType: "general_practitioner",
+    avatar: "JW",
+    online: false,
+    availabilityNote: "Invitation sent — awaiting first login",
+    firstName: "James",
+    lastName: "Wilson",
+    email: "j.wilson@hivecare.health",
+    phone: "555-201-3087",
+    address: "120 Campus Health Way, Suite 12",
+    professionalLevel: "General Practitioner",
+    status: "invitation_sent",
+    invitedAt: "2026-09-05T09:00:00.000Z",
   },
 ];
 
-export function getProfessional(id: string): HealthProfessional | undefined {
+export function findProfessionalById(
+  professionals: HealthProfessional[],
+  id: string,
+): HealthProfessional | undefined {
   return professionals.find((p) => p.id === id);
 }
